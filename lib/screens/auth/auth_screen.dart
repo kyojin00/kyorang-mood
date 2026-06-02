@@ -73,23 +73,29 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
 
     try {
       if (_isSignUp) {
-        await AuthService.instance.signUp(
+        final result = await AuthService.instance.signUp(
           email: email,
           password: password,
           name: name,
         );
-        // 가입 성공 — 이메일 인증이 켜져 있으면 확인 메일이 발송된다.
-        // (Supabase는 이메일 열거 공격 방지를 위해 이미 가입된 이메일도
-        //  정상 응답을 주므로, 두 경우를 모두 포괄하는 안내를 보여준다.)
-        // 인증 후 자동 로그인 흐름은 main.dart의 분기가 처리한다.
         if (!mounted) return;
-        setState(() {
-          _info =
-              '$email 주소로 확인 메일을 보냈어요.\n메일함의 링크를 눌러 인증을 완료해주세요.\n\n이미 가입한 적이 있다면 아래에서 로그인해주세요.';
-          // 인증 후 다시 와서 로그인할 수 있게 모드를 로그인으로 전환
-          _isSignUp = false;
-          _passwordController.clear();
-        });
+
+        if (result == SignUpResult.alreadyExists) {
+          // 이미 가입된 이메일 — 정확하게 안내
+          setState(() {
+            _error = '이미 가입된 이메일이에요. 아래에서 로그인해주세요.';
+            _isSignUp = false;
+            _passwordController.clear();
+          });
+        } else {
+          // 신규 가입 — 확인 메일 안내
+          setState(() {
+            _info =
+                '$email 주소로 확인 메일을 보냈어요.\n메일함의 링크를 눌러 인증을 완료해주세요.';
+            _isSignUp = false;
+            _passwordController.clear();
+          });
+        }
       } else {
         await AuthService.instance.signIn(
           email: email,
