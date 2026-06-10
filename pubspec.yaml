@@ -22,6 +22,9 @@ dependencies:
 
   # Supabase (상담 Edge Function 호출용)
   supabase_flutter: ^2.8.0
+  app_links: ^7.0.0
+  
+  google_sign_in: ^6.2.1
 
 dev_dependencies:
   flutter_test:
@@ -34,3 +37,8 @@ flutter:
 
   assets:
     - assets/mascot/
+
+  fonts:
+    - family: GowunDodum
+      fonts:
+        - asset: assets/fonts/GowunDodum-Regular.ttf

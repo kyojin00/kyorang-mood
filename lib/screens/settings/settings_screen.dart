@@ -1,183 +1,295 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../theme/app_theme.dart';
 import '../../providers/auth_provider.dart';
-import '../../services/auth_service.dart';
+import '../auth/delete_account_screen.dart';
+import '../review/review_screen.dart';
+import '../tasks/tasks_screen.dart';
 
 /// 설정 화면.
 ///
-/// 사용자 정보, 로그아웃, 그리고 추후 추가될 메뉴(이름 변경,
-/// 성향 다시 진단, 알림, 약관, 계정 삭제 등)를 모은다.
+/// 메인(일기장)에서 우상단 점셋을 누르면 들어옴. 다크 퍼플 톤이라
+/// 메인의 따뜻한 종이와 시각적으로 구분된다 — 여기는 "백오피스".
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final user = Supabase.instance.client.auth.currentUser;
+    final email = user?.email ?? '';
     final name = ref.watch(userNameProvider);
-    final email = AuthService.instance.currentUser?.email ?? '';
 
     return Scaffold(
       backgroundColor: AppTheme.background,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
-        title: const Text('설정'),
+        title: const Text(
+          '설정',
+          style: TextStyle(
+            color: AppTheme.textPrimary,
+            fontSize: 18,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        iconTheme: const IconThemeData(color: AppTheme.textPrimary),
       ),
       body: SafeArea(
         child: ListView(
-          padding: const EdgeInsets.symmetric(
-            horizontal: AppTheme.screenPadding,
-            vertical: 8,
-          ),
+          padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
           children: [
-            // 사용자 정보 카드
+            // 사용자 카드
             _UserCard(name: name, email: email),
+            const SizedBox(height: 24),
+
+            // 돌아보기
+            _SectionLabel('돌아보기'),
+            _SettingTile(
+              icon: Icons.event_note_outlined,
+              title: '챙기는 일정',
+              onTap: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => const TasksScreen(),
+                  ),
+                );
+              },
+            ),
+            _SettingTile(
+              icon: Icons.auto_stories_outlined,
+              title: '이번 주 돌아보기',
+              onTap: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => const ReviewScreen(),
+                  ),
+                );
+              },
+            ),
 
             const SizedBox(height: 24),
+
+            // 계정
             _SectionLabel('계정'),
-            _SettingsItem(
-              icon: Icons.badge_outlined,
-              label: '이름 변경',
-              subtitle: '무디가 부를 이름을 바꿔요',
-              comingSoon: true,
-              onTap: () => _showComingSoon(context),
+            _SettingTile(
+              icon: Icons.edit_outlined,
+              title: '이름 변경',
+              onTap: () => _showRenameDialog(context, ref, name),
             ),
-            _SettingsItem(
-              icon: Icons.psychology_outlined,
-              label: '성향 다시 진단',
-              subtitle: '맞춤 제안의 기준을 다시 정해요',
-              comingSoon: true,
-              onTap: () => _showComingSoon(context),
-            ),
-
-            const SizedBox(height: 16),
-            _SectionLabel('알림'),
-            _SettingsItem(
-              icon: Icons.notifications_none,
-              label: '알림 설정',
-              subtitle: '하루 한 번 기분 기록 알림',
-              comingSoon: true,
-              onTap: () => _showComingSoon(context),
-            ),
-
-            const SizedBox(height: 16),
-            _SectionLabel('정보'),
-            _SettingsItem(
-              icon: Icons.description_outlined,
-              label: '이용약관',
-              comingSoon: true,
-              onTap: () => _showComingSoon(context),
-            ),
-            _SettingsItem(
-              icon: Icons.shield_outlined,
-              label: '개인정보 처리방침',
-              comingSoon: true,
-              onTap: () => _showComingSoon(context),
-            ),
-            _SettingsItem(
-              icon: Icons.info_outline,
-              label: '앱 정보',
-              subtitle: '버전 1.0.0',
-              onTap: () {},
+            _SettingTile(
+              icon: Icons.logout_rounded,
+              title: '로그아웃',
+              danger: true,
+              onTap: () => _confirmLogout(context),
             ),
 
             const SizedBox(height: 24),
-            // 로그아웃 (강조)
-            _SettingsItem(
-              icon: Icons.logout,
-              label: '로그아웃',
-              danger: true,
-              onTap: () => _confirmLogout(context, ref),
+
+            // 앱
+            _SectionLabel('앱'),
+            _SettingTile(
+              icon: Icons.info_outline_rounded,
+              title: '교랑무드',
+              trailing: 'v0.1.0',
+              onTap: null,
             ),
-            _SettingsItem(
-              icon: Icons.delete_outline,
-              label: '계정 삭제',
-              danger: true,
-              comingSoon: true,
-              onTap: () => _showComingSoon(context),
-            ),
+
             const SizedBox(height: 24),
+
+            // 위험 구역 — 시각적으로 분리
+            _SectionLabel('위험 구역'),
+            _SettingTile(
+              icon: Icons.delete_forever_outlined,
+              title: '계정 삭제',
+              danger: true,
+              onTap: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => const DeleteAccountScreen(),
+                  ),
+                );
+              },
+            ),
           ],
         ),
       ),
     );
   }
 
-  void _showComingSoon(BuildContext context) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('곧 만나요'),
-        duration: Duration(seconds: 1),
-        behavior: SnackBarBehavior.floating,
-      ),
-    );
-  }
-
-  Future<void> _confirmLogout(BuildContext context, WidgetRef ref) async {
-    final confirmed = await showDialog<bool>(
+  Future<void> _showRenameDialog(
+    BuildContext context,
+    WidgetRef ref,
+    String currentName,
+  ) async {
+    final controller = TextEditingController(text: currentName);
+    final newName = await showDialog<String>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: AppTheme.surface,
-        title: const Text('로그아웃할까요?'),
-        content: const Text('다시 로그인하면 이어서 사용할 수 있어요.'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('취소'),
+      builder: (ctx) {
+        return AlertDialog(
+          backgroundColor: AppTheme.surface,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
           ),
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(true),
-            child: const Text(
-              '로그아웃',
-              style: TextStyle(color: AppTheme.error),
+          title: const Text(
+            '이름 변경',
+            style: TextStyle(
+              color: AppTheme.textPrimary,
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
             ),
           ),
-        ],
-      ),
+          content: TextField(
+            controller: controller,
+            autofocus: true,
+            maxLength: 20,
+            style: const TextStyle(color: AppTheme.textPrimary, fontSize: 15),
+            decoration: const InputDecoration(
+              hintText: '새 이름',
+              counterText: '',
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(),
+              style: TextButton.styleFrom(
+                foregroundColor: AppTheme.textTertiary,
+              ),
+              child: const Text('취소'),
+            ),
+            TextButton(
+              onPressed: () {
+                final v = controller.text.trim();
+                if (v.isNotEmpty) Navigator.of(ctx).pop(v);
+              },
+              style: TextButton.styleFrom(
+                foregroundColor: AppTheme.accentLight,
+              ),
+              child: const Text('저장'),
+            ),
+          ],
+        );
+      },
     );
 
-    if (confirmed != true) return;
-    await AuthService.instance.signOut();
-    // 로그아웃되면 main.dart의 분기가 자동으로 로그인 화면으로 보낸다.
-    // 설정 화면은 그 위에 떠 있으니 닫아준다.
-    if (context.mounted) {
-      Navigator.of(context).popUntil((route) => route.isFirst);
+    if (newName == null || newName == currentName) return;
+
+    // Supabase user_metadata 업데이트
+    try {
+      await Supabase.instance.client.auth.updateUser(
+        UserAttributes(data: {'display_name': newName}),
+      );
+      // 로컬 상태도 새로고침
+      ref.invalidate(userNameProvider);
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('이름이 바뀌었어요'),
+          duration: Duration(seconds: 2),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } catch (_) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('이름 변경에 실패했어요'),
+          duration: Duration(seconds: 2),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
     }
+  }
+
+  Future<void> _confirmLogout(BuildContext context) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) {
+        return AlertDialog(
+          backgroundColor: AppTheme.surface,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          title: const Text(
+            '로그아웃 할까요?',
+            style: TextStyle(
+              color: AppTheme.textPrimary,
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          content: const Text(
+            '다시 로그인하면 대화는 그대로 있어요.',
+            style: TextStyle(
+              color: AppTheme.textSecondary,
+              fontSize: 14,
+              height: 1.5,
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(false),
+              style: TextButton.styleFrom(
+                foregroundColor: AppTheme.textTertiary,
+              ),
+              child: const Text('취소'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(true),
+              style: TextButton.styleFrom(
+                foregroundColor: const Color(0xFFE08A8A),
+              ),
+              child: const Text('로그아웃'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirm != true) return;
+    if (!context.mounted) return;
+
+    await Supabase.instance.client.auth.signOut();
+    // _RootScreen이 isLoggedInProvider를 보고 자동으로 AuthScreen으로 보냄.
+    // 설정 화면은 그 사이 빠져도 무방하지만, 안전하게 한 번 pop.
+    if (context.mounted) Navigator.of(context).maybePop();
   }
 }
 
 class _UserCard extends StatelessWidget {
   final String name;
   final String email;
-
   const _UserCard({required this.name, required this.email});
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: AppTheme.surface,
-        borderRadius: BorderRadius.circular(AppTheme.radius),
-        border: Border.all(color: AppTheme.divider, width: 1),
+        color: AppTheme.surface.withValues(alpha: 0.5),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: AppTheme.divider.withValues(alpha: 0.5),
+          width: 1,
+        ),
       ),
       child: Row(
         children: [
           Container(
             width: 48,
             height: 48,
-            decoration: const BoxDecoration(
-              color: AppTheme.accentDark,
+            decoration: BoxDecoration(
+              color: AppTheme.accent.withValues(alpha: 0.2),
               shape: BoxShape.circle,
             ),
             alignment: Alignment.center,
             child: Text(
               name.isNotEmpty ? name.characters.first : '?',
               style: const TextStyle(
-                color: Colors.white,
+                color: AppTheme.textPrimary,
                 fontSize: 20,
-                fontWeight: FontWeight.w700,
+                fontWeight: FontWeight.w600,
               ),
             ),
           ),
@@ -187,17 +299,21 @@ class _UserCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  '$name님',
-                  style: Theme.of(context).textTheme.titleMedium,
-                ),
-                if (email.isNotEmpty) ...[
-                  const SizedBox(height: 2),
-                  Text(
-                    email,
-                    style: Theme.of(context).textTheme.bodySmall,
-                    overflow: TextOverflow.ellipsis,
+                  name,
+                  style: const TextStyle(
+                    color: AppTheme.textPrimary,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
                   ),
-                ],
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  email,
+                  style: const TextStyle(
+                    color: AppTheme.textSecondary,
+                    fontSize: 12,
+                  ),
+                ),
               ],
             ),
           ),
@@ -214,91 +330,75 @@ class _SectionLabel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(4, 8, 4, 8),
+      padding: const EdgeInsets.fromLTRB(4, 0, 0, 10),
       child: Text(
         text,
-        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              color: AppTheme.textTertiary,
-              fontWeight: FontWeight.w600,
-            ),
+        style: const TextStyle(
+          color: AppTheme.textTertiary,
+          fontSize: 12,
+          fontWeight: FontWeight.w600,
+          letterSpacing: 0.5,
+        ),
       ),
     );
   }
 }
 
-class _SettingsItem extends StatelessWidget {
+class _SettingTile extends StatelessWidget {
   final IconData icon;
-  final String label;
-  final String? subtitle;
-  final VoidCallback onTap;
-  final bool comingSoon;
+  final String title;
+  final String? trailing;
   final bool danger;
+  final VoidCallback? onTap;
 
-  const _SettingsItem({
+  const _SettingTile({
     required this.icon,
-    required this.label,
-    required this.onTap,
-    this.subtitle,
-    this.comingSoon = false,
+    required this.title,
+    this.trailing,
     this.danger = false,
+    required this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
-    final color = danger ? AppTheme.error : AppTheme.textPrimary;
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 2),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(AppTheme.radiusSmall),
-          child: Padding(
-            padding:
-                const EdgeInsets.symmetric(horizontal: 8, vertical: 14),
-            child: Row(
-              children: [
-                Icon(icon, size: 22, color: color),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        label,
-                        style: TextStyle(
-                          color: color,
-                          fontSize: 15,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                      if (subtitle != null) ...[
-                        const SizedBox(height: 2),
-                        Text(
-                          subtitle!,
-                          style: Theme.of(context).textTheme.bodySmall,
-                        ),
-                      ],
-                    ],
+    final color = danger ? const Color(0xFFE08A8A) : AppTheme.textPrimary;
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding:
+              const EdgeInsets.symmetric(horizontal: 8, vertical: 14),
+          child: Row(
+            children: [
+              Icon(icon, color: color, size: 20),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Text(
+                  title,
+                  style: TextStyle(
+                    color: color,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w500,
                   ),
                 ),
-                if (comingSoon)
-                  Container(
-                    width: 6,
-                    height: 6,
-                    decoration: const BoxDecoration(
-                      color: AppTheme.accentLight,
-                      shape: BoxShape.circle,
-                    ),
-                  )
-                else if (!danger)
-                  const Icon(
-                    Icons.chevron_right,
+              ),
+              if (trailing != null)
+                Text(
+                  trailing!,
+                  style: const TextStyle(
                     color: AppTheme.textTertiary,
-                    size: 20,
+                    fontSize: 13,
                   ),
-              ],
-            ),
+                )
+              else if (onTap != null)
+                const Icon(
+                  Icons.chevron_right_rounded,
+                  color: AppTheme.textTertiary,
+                  size: 20,
+                ),
+            ],
           ),
         ),
       ),
